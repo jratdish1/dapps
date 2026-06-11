@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  docs-check:
+    name: Docs Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify README.md exists
+        run: |
+          if [ ! -f README.md ]; then
+            echo "ERROR: README.md not found"
+            exit 1
+          fi
+          echo "README.md found ($(wc -l < README.md) lines)"
+
+      - name: Validate dapp list JSON
+        run: |
+          if [ -f zkxwallet-dapplist.json ]; then
+            python3 -c "import json; data=json.load(open('zkxwallet-dapplist.json')); print(f'zkxwallet-dapplist.json is valid JSON with {len(data) if isinstance(data, list) else "object"} entries')"
+          else
+            echo "No dapplist JSON found — skipping validation"
+          fi
+
+      - name: Check for accidental secret-like patterns
+        run: |
+          echo "Scanning for accidental secret patterns..."
+          if grep -rE "(api_key|secret_key|private_key|password|token)\s*=\s*['"][^'"]{8,}" .             --include="*.md" --include="*.json" --include="*.txt"             --exclude-dir=".git" 2>/dev/null | grep -v "YOUR_" | grep -v "example" | grep -v "placeholder"; then
+            echo "WARNING: Possible secret-like patterns found above. Review before merging."
+          else
+            echo "No secret-like patterns detected."
+          fi
